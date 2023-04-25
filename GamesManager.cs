@@ -22,6 +22,8 @@ public class GamesManager : MonoBehaviour
 	public Transform CartridgeParent;
 	public Transform ButtonParent;
 	
+	bool moving = false;
+	
 	int selectedGame = 0;
 	
 	List<string> launchPaths = new List<string>();
@@ -29,6 +31,10 @@ public class GamesManager : MonoBehaviour
 	void Start()
 	{
 		UpdateGames();
+		Screen.fullScreen = false;
+		Screen.fullScreenMode = FullScreenMode.Windowed;
+		Screen.SetResolution(1280, 720, false);
+		QualitySettings.vSyncCount = 1;
 	}
 	
 	void Update()
@@ -58,24 +64,52 @@ public class GamesManager : MonoBehaviour
 		obj.transform.position = targetPosition;
 	}
 	
+	void OnApplicationFocus(bool hasFocus)
+	{
+		if (hasFocus)
+		{
+			int width = Screen.width;
+			int height = width * 9 / 16;
+			Screen.SetResolution(width, height, false);
+		}
+	}
+	
 	public void SeekToGame(string name)
 	{
-		//Get difference between x-positions of selected and wanted cartridges and then move the parent object by that difference.
-		GameObject[] gameObjects1 = games[name];
-		GameObject[] gameObjects2 = games[games.Keys.Cast<string>().ElementAt(selectedGame)];
-		
-		List<string> keys = games.Keys.ToList();
-		selectedGame = keys.IndexOf(name);
-		
-		float diff = gameObjects1[1].transform.position.x - gameObjects2[1].transform.position.x;
-		UDebug.Log(diff);
-		float timeToSwitch = 0.5f;
-		StartCoroutine(MoveObject(CartridgeParent.gameObject, CartridgeParent.position + new Vector3(-diff,0,0), timeToSwitch));
+		if(!moving)
+		{
+			moving = true;
+			//Get difference between x-positions of selected and wanted cartridges and then move the parent object by that difference.
+			GameObject[] gameObjects1 = games[name];
+			GameObject[] gameObjects2 = games[games.Keys.Cast<string>().ElementAt(selectedGame)];
+			
+			List<string> keys = games.Keys.ToList();
+			selectedGame = keys.IndexOf(name);
+			
+			float diff = gameObjects1[1].transform.position.x - gameObjects2[1].transform.position.x;
+			UDebug.Log(diff);
+			float timeToSwitch = 0.5f;
+			StartCoroutine(MoveObject(CartridgeParent.gameObject, CartridgeParent.position + new Vector3(-diff,0,0), timeToSwitch));
+			Invoke("StopMoving", timeToSwitch);
+		}
+	}
+	
+	void StopMoving()
+	{
+		moving = false;
 	}
 	
 	public void Play()
 	{
 		StartCoroutine(LaunchGame());
+	}
+	
+	string GetFirstLine(string path)
+	{
+		using (StreamReader reader = new StreamReader(path))
+		{
+			return reader.ReadLine();
+		}
 	}
 	
 	IEnumerator LaunchGame()
@@ -86,7 +120,12 @@ public class GamesManager : MonoBehaviour
 		Process process = Process.Start(launchPaths[selectedGame]);
 		Thread.Sleep(5000);
 		// Find the game's process
-		Process[] processes = Process.GetProcessesByName(games.Keys.ToList()[selectedGame]);
+		
+		var list = launchPaths[selectedGame].Split(@"\");
+		list[list.Length-1] = null;
+		
+		Process[] processes = Process.GetProcessesByName(GetFirstLine(string.Join(@"\", list)+"processName.txt"));
+		UDebug.Log(GetFirstLine(string.Join(@"\", list)+"processName.txt"));
 		if (processes.Length > 0)
 		{
 			Process gameProcess = processes[0];
