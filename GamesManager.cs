@@ -28,25 +28,21 @@ public class GamesManager : MonoBehaviour
 	
 	List<string> launchPaths = new List<string>();
 	
+	public Scrollbar scrollbar;
+	
+	bool ready = false;
+	
+	//AUDIO STUFF
+	public AudioSource source;
+	public AudioClip[] clips;
+	
 	void Start()
 	{
-		UpdateGames();
-		Screen.fullScreen = false;
-		Screen.fullScreenMode = FullScreenMode.Windowed;
-		Screen.SetResolution(1280, 720, false);
+		StartCoroutine(UpdateGames());
 		QualitySettings.vSyncCount = 1;
 	}
 	
-	void Update()
-	{
-		if(Input.GetKeyDown("a"))
-		{
-			//move left
-		}else if(Input.GetKeyDown("d"))
-		{
-			//move right
-		}
-	}
+	
 	
 	IEnumerator MoveObject(GameObject obj, Vector3 targetPosition, float duration)
 	{
@@ -87,7 +83,7 @@ public class GamesManager : MonoBehaviour
 			selectedGame = keys.IndexOf(name);
 			
 			float diff = gameObjects1[1].transform.position.x - gameObjects2[1].transform.position.x;
-			UDebug.Log(diff);
+			//UDebug.Log(diff);
 			float timeToSwitch = 0.5f;
 			StartCoroutine(MoveObject(CartridgeParent.gameObject, CartridgeParent.position + new Vector3(-diff,0,0), timeToSwitch));
 			Invoke("StopMoving", timeToSwitch);
@@ -104,6 +100,11 @@ public class GamesManager : MonoBehaviour
 		StartCoroutine(LaunchGame());
 	}
 	
+	void PlaySound(int index)
+	{
+		source.PlayOneShot(clips[index], 0.2f);
+	}
+	
 	string GetFirstLine(string path)
 	{
 		using (StreamReader reader = new StreamReader(path))
@@ -114,9 +115,12 @@ public class GamesManager : MonoBehaviour
 	
 	IEnumerator LaunchGame()
 	{
+		PlaySound(0);
 		GameObject currentCartridge = games[games.Keys.Cast<string>().ElementAt(selectedGame)][1];
 		StartCoroutine(MoveObject(currentCartridge, currentCartridge.transform.position - new Vector3(0,4,0), 1f));
-		yield return new WaitForSeconds(1);
+		yield return new WaitForSeconds(0.8f);
+		PlaySound(1);
+		yield return new WaitForSeconds(0.2f);
 		Process process = Process.Start(launchPaths[selectedGame]);
 		Thread.Sleep(5000);
 		// Find the game's process
@@ -157,7 +161,7 @@ public class GamesManager : MonoBehaviour
 		UDebug.LogError("Error loading image: File not found");
 	}
 
-	void UpdateGames()
+	IEnumerator UpdateGames()
 	{
 		//Paths to all game dirs
 		string[] gameDirs = Directory.GetDirectories("C:\\Users\\Coldy\\Desktop\\Games");
@@ -166,8 +170,10 @@ public class GamesManager : MonoBehaviour
 		launchPaths = new List<string>();
 		
 		int i = 0;
+		bool done = true;
 		foreach (string dir in gameDirs)
 		{
+			done = false;
 			string[] tempList = dir.Split(@"\");
 			
 			string name = tempList[tempList.Length - 1];
@@ -200,13 +206,23 @@ public class GamesManager : MonoBehaviour
 				
 				//Add to List
 				launchPaths.Add(dir + @"\app.lnk");
-				
+				UDebug.Log("GAME DONE");
+				done = true;
 				i++;
 			}));
+			yield return new WaitUntil(() => done);
 		}
 		
-		UDebug.Log("Games Hashtable updated.");
-		
-		
+		UDebug.Log("Games Dictionary updated.");
+		scrollbar.GetComponent<Scrollbar>().size = 13f/games.Keys.ToList().Count;
+		ready = true;
+	}
+	
+	void Update()
+	{
+		if(ready)
+		{
+			ButtonParent.localPosition = new Vector3(-732,420+(games.Keys.ToList().Count-13)*70f*scrollbar.GetComponent<Scrollbar>().value,0);
+		}
 	}
 }
